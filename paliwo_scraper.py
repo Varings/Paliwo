@@ -1,53 +1,69 @@
 import requests
+from bs4 import BeautifulSoup
 import json
+import re
 
 def pobierz_ceny():
-    # To jest najbardziej stabilny agregator danych rządowych w UK
-    url = "https://www.petrolprices.com/public-api/fuel-prices-data.json"
-    # Zapasowy adres (jeśli powyższy by zawiódł)
-    backup_url = "https://get-fuel-prices.service.gov.uk/data.json"
+    # Ten link działał w przeglądarce, więc użyjemy go jako źródła
+    url = "https://www.fuel-finder.uk/?q=gl3+4zl&lat=51.849030&lng=-2.170875&radius=10&fuel=petrol"
     
-    headers = {'User-Agent': 'Mozilla/5.0'}
-    
-    try:
-        print("Próba pobrania danych...")
-        try:
-            response = requests.get(url, headers=headers, timeout=15)
-            response.raise_for_status()
-        except:
-            print("Pierwszy link zawiódł, próbuję zapasowy...")
-            response = requests.get(backup_url, headers=headers, timeout=15)
-            response.raise_for_status()
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-GB,en;q=0.5',
+    }
 
-        data = response.json()
-        stations = []
+    try:
+        print(f"Pobieranie strony: {url}")
+        response = requests.get(url, headers=headers, timeout=20)
+        response.raise_for_status()
         
-        # Przeszukujemy stacje
-        for s in data.get('stations', []):
-            pc = s.get('postcode', '').upper().replace(" ", "")
-            # Szukamy wszystkiego co zaczyna się od GL3 lub GL (Gloucester)
-            if pc.startswith("GL3") or pc.startswith("GL1"):
-                prices = s.get('prices', {})
+        soup = BeautifulSoup(response.text, 'html.parser')
+        stations = []
+
+        # W 2026 strony często ukrywają dane wewnątrz skryptów JSON-LD lub prostych tabel
+        # Szukamy wszystkich bloków, które wyglądają jak stacje paliw
+        # Szukamy po klasach CSS, które są standardem dla tej witryny
+        cards = soup.find_all(['div', 'li'], class_=re.compile(r'station|result|item', re.I))
+
+        for card in cards:
+            text = card.get_text(separator='|', strip=True)
+            # Szukamy wzorca ceny (np. 142.9p lub 142.9)
+            price_match = re.search(r'(\d{2,3}\.\d)', text)
+            
+            if price_match:
+                # Próbujemy wyłuskać nazwę (zazwyczaj pierwszy tekst przed ceną)
+                parts = text.split('|')
+                brand = parts[0] if len(parts) > 0 else "Unknown"
+                
                 stations.append({
-                    "brand": s.get('brand', 'Unknown'),
-                    "name": s.get('name', 'N/A'),
-                    "price": prices.get('E10', prices.get('Petrol', '0')),
-                    "diesel": prices.get('B7', prices.get('Diesel', '0')),
-                    "postcode": s.get('postcode')
+                    "stacja": brand,
+                    "cena": price_match.group(1),
+                    "postcode": "GL3",
+                    "raw": text[:50] # dla debugowania
                 })
 
-        # Sortowanie po cenie benzyny
-        stations.sort(key=lambda x: float(x['price']) if str(x['price']).replace('.','').isdigit() and float(x['price']) > 0 else 999)
+        # Jeśli selektory zawiodły, szukamy po prostu liczb obok słowa 'p' lub '£'
+        if not stations:
+            print("Szukam wzorców tekstowych...")
+            all_text = soup.get_text(separator=' ')
+            prices = re.findall(r'([A-Za-z0-9\s]+)\s+(\d{3}\.\d)p', all_text)
+            for p in prices:
+                stations.append({"stacja": p[0].strip()[-15:], "cena": p[1], "postcode": "GL3"})
+
+        # Jeśli nadal nic (np. blokada bota), zapisz wiadomość o błędzie
+        if not stations:
+             stations = [{"stacja": "Brak danych - strona zmieniła układ", "cena": "0"}]
 
         with open('ceny.json', 'w', encoding='utf-8') as f:
             json.dump(stations, f, indent=4)
         
-        print(f"Sukces! Znaleziono {len(stations)} stacji.")
-            
+        print(f"Zakończono. Znaleziono: {len(stations)}")
+
     except Exception as e:
         print(f"Błąd: {e}")
         with open('ceny.json', 'w') as f:
-            json.dump([{"error": "API currently unavailable", "details": str(e)}], f)
+            json.dump([{"error": "Scraping failed", "details": str(e)}], f)
 
 if __name__ == "__main__":
     pobierz_ceny()
