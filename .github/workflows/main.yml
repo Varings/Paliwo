@@ -25,6 +25,7 @@ jobs:
         run: |
           git config --global user.name "PaliwoBot"
           git config --global user.email "bot@github.com"
+          git pull --rebase origin main  # TO NAPRAWI BŁĄD REJECTED
           git add ceny.json
           git commit -m "Aktualizacja cen: $(date)" || exit 0
           git push
