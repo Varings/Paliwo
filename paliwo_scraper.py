@@ -9,43 +9,44 @@ def pobierz_ceny_przez_ai():
         return
 
     genai.configure(api_key=api_key)
-
-    # Według logu błędu 400, Twój plan wymaga nazwy 'google_search'
-    tools = [{"google_search": {}}]
+    
+    # ZMIANA: Dla Gemini 1.5 używamy 'google_search_retrieval'
+    # 'google_search' jest używane w nowym SDK (google-genai) lub modelach 2.0+
+    tools_config = [{'google_search_retrieval': {}}]
 
     try:
-        # Korzystamy z Gemini 3.1 Pro (zgodnie z Twoją prośbą o najnowszą wersję)
         model = genai.GenerativeModel(
-            model_name='gemini-3.1-pro-preview',
-            tools=tools
+            model_name='gemini-1.5-pro',
+            tools=tools_config
         )
 
         prompt = """
         Search the internet for current petrol (E10) prices in GL3 (Gloucester, UK). 
-        Specifically look for Tesco Brockworth and Shell.
+        Focus on Tesco Brockworth and Shell. 
         Return ONLY a JSON list of objects.
-        Required format: [{"stacja": "Tesco", "cena": 142.9, "postcode": "GL3", "data_sprawdzenia": "YYYY-MM-DD"}]
+        Format: [{"stacja": "Tesco", "cena": 142.9, "postcode": "GL3"}]
         """
 
-        print("Agent Gemini 3.1 Pro przeszukuje internet...")
+        print("Agent Gemini (Search Mode) sprawdza ceny...")
         
-        # Wymuszamy czysty format JSON
+        # Opcjonalnie: dodanie generation_config wymuszającego JSON
         response = model.generate_content(
             prompt,
             generation_config={"response_mime_type": "application/json"}
         )
         
+        # Parsowanie odpowiedzi
         data = json.loads(response.text)
-        print(f"Sukces! Pobrano dane dla: {len(data)} stacji.")
+        print("Sukces! Dane pobrane.")
 
     except Exception as e:
-        print(f"Wystąpił błąd podczas pracy AI: {e}")
+        print(f"Błąd: {e}")
         data = [{"stacja": "Błąd AI", "cena": 0, "error": str(e)}]
 
-    # Zapis do pliku - zawsze wykonywany, aby GitHub Actions nie zgłosiło błędu 128
+    # Zapis do pliku
     with open('ceny.json', 'w', encoding='utf-8') as f:
         json.dump(data, f, indent=4, ensure_ascii=False)
-    print("Plik ceny.json został zaktualizowany.")
+    print("Plik ceny.json zaktualizowany.")
 
 if __name__ == "__main__":
     pobierz_ceny_przez_ai()
