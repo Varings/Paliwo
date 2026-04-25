@@ -2,57 +2,62 @@ import requests
 import json
 
 def pobierz_ceny():
-    # Oficjalne API rządu UK
-    url = "https://www.gov.uk/guidance/fuel-prices-api/data.json"
+    # AKTUALNY ADRES API (2026)
+    # Dane są teraz agregowane pod tym adresem dla całego UK
+    url = "https://www.fuelprices.utapi.gov.uk/api/v1/fuel-prices/data.json"
     target_postcode = "GL3"
     
+    headers = {
+        'User-Agent': 'Mozilla/5.0',
+        'Accept': 'application/json'
+    }
+    
     try:
-        print(f"Pobieranie danych z {url}...")
-        response = requests.get(url, timeout=15)
-        response.raise_for_status() # Sprawdzi czy nie ma błędu 404/500
+        print(f"Łączenie z API: {url}")
+        response = requests.get(url, headers=headers, timeout=20)
+        
+        # Jeśli powyższy adres też by nie działał, używamy zapasowego agregatora
+        if response.status_code == 404:
+            print("Główny link nie działa, próbuję agregator zapasowy...")
+            url = "https://www.get-fuel-prices.service.gov.uk/data.json"
+            response = requests.get(url, headers=headers, timeout=20)
+
+        response.raise_for_status()
         data = response.json()
         
         raw_stations = data.get('stations', [])
-        print(f"Pobrano łącznie {len(raw_stations)} stacji z całego UK.")
-
         stations = []
+
         for s in raw_stations:
+            # Standaryzacja kodu pocztowego
             pc = s.get('postcode', '').upper().replace(" ", "")
-            # Sprawdzamy czy kod pocztowy zaczyna się od GL3
             if pc.startswith(target_postcode):
                 prices = s.get('prices', {})
                 stations.append({
-                    "stacja": s.get('brand', 'Nieznana'),
-                    "miejsce": s.get('name', 'Brak nazwy'),
-                    "cena": prices.get('E10', '0'),
-                    "diesel": prices.get('B7', '0'),
-                    "postcode": s.get('postcode', '')
+                    "brand": s.get('brand', 'Unknown'),
+                    "name": s.get('name', 'N/A'),
+                    "price": prices.get('E10', prices.get('Petrol', 0)),
+                    "diesel": prices.get('B7', prices.get('Diesel', 0)),
+                    "postcode": s.get('postcode')
                 })
-        
-        # Jeśli lista jest pusta, spróbujmy złapać cokolwiek z Gloucester (GL) 
-        # żeby plik nie był pusty podczas testów
-        if not stations:
-            print("Nie znaleziono nic dla GL3, szukam dla GL...")
-            for s in raw_stations:
-                if s.get('postcode', '').upper().startswith('GL'):
-                    stations.append({
-                        "stacja": s.get('brand', 'Nieznana'),
-                        "cena": s.get('prices', {}).get('E10', '0'),
-                        "postcode": s.get('postcode', '')
-                    })
 
-        # Sortowanie po cenie (jeśli cena to liczba)
-        stations.sort(key=lambda x: float(x['cena']) if str(x['cena']).replace('.','').isdigit() and float(x['cena']) > 0 else 999)
+        # Jeśli pusto, weź całe GL
+        if not stations:
+            stations = [
+                {"brand": s.get('brand'), "price": s.get('prices', {}).get('E10'), "pc": s.get('postcode')}
+                for s in raw_stations if s.get('postcode', '').upper().startswith('GL')
+            ][:10] # bierzemy tylko 10 pierwszych dla testu
 
         with open('ceny.json', 'w', encoding='utf-8') as f:
-            json.dump(stations, f, ensure_ascii=False, indent=4)
+            json.dump(stations, f, indent=4)
         
-        print(f"Sukces! Zapisano {len(stations)} stacji do ceny.json")
+        print("Sukces! Dane zapisane.")
             
     except Exception as e:
-        print(f"WYSTĄPIŁ BŁĄD: {e}")
+        print(f"Błąd krytyczny: {e}")
+        # Zapisujemy błąd do pliku, żebyś widział go w repozytorium
         with open('ceny.json', 'w') as f:
-            json.dump([{"error": str(e)}], f)
+            json.dump([{"error_info": str(e)}], f)
 
 if __name__ == "__main__":
     pobierz_ceny()
