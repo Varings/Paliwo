@@ -21,7 +21,7 @@ jobs:
 
       - name: Instalacja bibliotek
         # Dodajemy flagę -U (upgrade), aby na pewno zainstalować wersję z 2026 roku
-        run: pip install -U requests beautifulsoup4 google-generativeai
+        run: pip install -U requests beautifulsoup4 google-genai
 
       - name: Pobieranie danych
         env:
