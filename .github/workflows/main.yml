@@ -20,11 +20,10 @@ jobs:
           python-version: '3.11'
 
       - name: Instalacja bibliotek
-        # DODALIŚMY google-generativeai
-        run: pip install requests beautifulsoup4 google-generativeai
+        # Dodajemy flagę -U (upgrade), aby na pewno zainstalować wersję z 2026 roku
+        run: pip install -U requests beautifulsoup4 google-generativeai
 
       - name: Pobieranie danych
-        # PRZEKAZUJEMY KLUCZ Z SEKRETÓW GITHUBA DO SKRYPTU
         env:
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
         run: python paliwo_scraper.py
@@ -36,6 +35,8 @@ jobs:
           git config --global user.name "PaliwoBot"
           git config --global user.email "bot@github.com"
           git add ceny.json
-          git commit -m "Aktualizacja cen przez AI: $(date)" || exit 0
+          # Commitujemy zmiany w pliku ceny.json
+          git commit -m "Aktualizacja cen przez Gemini 3.1 Pro: $(date)" || exit 0
+          # Rebase łączy zmiany bota z Twoimi zmianami z przeglądarki
           git pull --rebase origin main
           git push origin main
