@@ -2,6 +2,6 @@
     {
         "stacja": "Błąd AI",
         "cena": 0,
-        "error": "Unknown field for FunctionDeclaration: google_search"
+        "error": "400 google_search_retrieval is not supported. Please use google_search tool instead."
     }
 ]
