@@ -1,0 +1,26 @@
+name: Odswiez Ceny Paliw
+on:
+  schedule:
+    - cron: '0 * * * *' # Odświeżaj co godzinę
+  workflow_dispatch:   # Pozwala kliknąć "Run" ręcznie
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Ustawienie Pythona
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+      - name: Instalacja bibliotek
+        run: pip install requests beautifulsoup4
+      - name: Pobieranie danych
+        run: python paliwo_scraper.py
+      - name: Zapisanie zmian w repozytorium
+        run: |
+          git config --global user.name "PaliwoBot"
+          git config --global user.email "bot@github.com"
+          git add ceny.json
+          git commit -m "Aktualizacja cen: $(date)" || exit 0
+          git push
