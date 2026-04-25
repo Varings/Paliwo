@@ -10,39 +10,25 @@ def pobierz_ceny_przez_ai():
 
     genai.configure(api_key=api_key)
     
-    # Lista modeli Gemini 3 według Twoich release notes z 2026
-    modele_do_testu = ['gemini-3.1-pro-preview', 'gemini-3.1-flash-preview', 'gemini-3-pro-preview']
-    
-    response = None
-    prompt = """
-    Check real-time petrol (E10) prices for GL3 (Gloucester, UK). 
-    Search for Tesco Brockworth and Shell. 
-    Return ONLY a JSON list of objects.
-    Format: [{"stacja": "Tesco", "cena": 142.9, "postcode": "GL3"}]
-    """
-
-    for model_name in modele_do_testu:
-        try:
-            print(f"Próbuję użyć modelu: {model_name}...")
-            # W Gemini 3 Search jest często domyślnie dostępny lub jako narzędzie
-            model = genai.GenerativeModel(
-                model_name=model_name,
-                tools=[{'google_search_retrieval': {}}]
-            )
-            response = model.generate_content(prompt)
-            if response:
-                print(f"Sukces z modelem {model_name}!")
-                break
-        except Exception as e:
-            print(f"Model {model_name} nie odpowiedział: {e}")
-            continue
-
-    if not response:
-        print("Żaden model Gemini 3 nie zadziałał. Sprawdź limity na koncie.")
-        return
-
+    # Deklarujemy narzędzie wyszukiwania zgodnie ze standardem Gemini 3.1
+    # Używamy modelu 3.1 Pro, który widnieje w Twoich notatkach jako najnowszy
     try:
-        # Oczyszczanie i zapisywanie danych
+        model = genai.GenerativeModel(
+            model_name='gemini-3.1-pro-preview',
+            tools=[{'google_search': {}}]
+        )
+
+        prompt = """
+        Search the internet for current petrol (E10) prices in GL3 (Gloucester, UK). 
+        Focus on Tesco Brockworth and Shell. 
+        Return ONLY a JSON list of objects.
+        Format: [{"stacja": "Tesco", "cena": 142.9, "postcode": "GL3"}]
+        """
+
+        print("Agent Gemini 3.1 Pro szuka cen w Google...")
+        response = model.generate_content(prompt)
+        
+        # Oczyszczanie tekstu (AI czasem dodaje ```json ... ```)
         text = response.text.strip()
         if "```json" in text:
             text = text.split("```json")[1].split("```")[0].strip()
@@ -50,16 +36,17 @@ def pobierz_ceny_przez_ai():
             text = text.split("```")[1].split("```")[0].strip()
 
         data = json.loads(text)
-
-        with open('ceny.json', 'w', encoding='utf-8') as f:
-            json.dump(data, f, indent=4, ensure_ascii=False)
-        
-        print("Plik ceny.json został zaktualizowany przez Gemini 3!")
+        print("Sukces! Dane pobrane.")
 
     except Exception as e:
-        print(f"Błąd przetwarzania JSON: {e}")
-        with open('ceny.json', 'w') as f:
-            json.dump([{"error": "JSON parse error", "details": str(e)}], f)
+        print(f"Błąd podczas pracy Gemini 3.1: {e}")
+        # Bezpiecznik: tworzymy plik z błędem, aby Git go znalazł
+        data = [{"stacja": "Błąd AI", "cena": 0, "error": str(e)}]
+
+    # Zapisujemy plik poza blokiem try, aby zawsze istniał dla Gita
+    with open('ceny.json', 'w', encoding='utf-8') as f:
+        json.dump(data, f, indent=4, ensure_ascii=False)
+    print("Plik ceny.json został wygenerowany.")
 
 if __name__ == "__main__":
     pobierz_ceny_przez_ai()
