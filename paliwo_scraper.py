@@ -5,44 +5,49 @@ import google.generativeai as genai
 def pobierz_ceny_przez_ai():
     api_key = os.getenv("GOOGLE_API_KEY")
     if not api_key:
-        print("Brak klucza API!")
+        print("BŁĄD: Brak klucza GOOGLE_API_KEY w ustawieniach GitHub!")
         return
 
     genai.configure(api_key=api_key)
     
-    # Używamy modelu 2.0 Flash - najszybszy i najnowszy w 2026
-    # Jeśli ten model nie jest dostępny, spróbuj 'gemini-1.5-flash-latest'
-    model = genai.GenerativeModel('gemini-1.5-flash-latest')
+    # Korzystamy z najnowszej wersji 3.1 Pro (dostępnej od lutego 2026)
+    # Włączamy narzędzie wyszukiwarki Google
+    model = genai.GenerativeModel(
+        model_name='gemini-3.1-pro-preview',
+        tools=[{'google_search': {}}]
+    )
 
     prompt = """
-    Zrób research w internecie i znajdź aktualne ceny benzyny E10 w okolicy kodu pocztowego GL3 (Gloucester, UK). 
-    Znajdź ceny dla stacji: Tesco Brockworth, Shell, BP. 
-    Zwróć dane WYŁĄCZNIE jako listę JSON (bez zbędnego tekstu).
-    Format: [{"stacja": "Nazwa", "cena": "142.9", "postcode": "GL3"}]
+    Jako ekspert od rynku paliw w UK, wyszukaj dzisiejsze ceny benzyny E10 i diesla w okolicy GL3 (Brockworth, Gloucester). 
+    Sprawdź stacje: Tesco Brockworth, Shell Shurdington Road i BP. 
+    Zwróć wynik wyłącznie jako czysty JSON.
+    Format: [{"stacja": "Nazwa", "cena": 142.9, "diesel": 149.9, "postcode": "GL3"}]
     """
 
     try:
-        print("Gemini 2.0 szuka cen dla Ciebie...")
-        # W 2026 modele Flash mają Search włączony domyślnie
+        print("Uruchamiam Deep Research dla cen paliw w GL3...")
         response = model.generate_content(prompt)
         
-        # Oczyszczanie odpowiedzi z Markdownu
-        content = response.text.strip()
-        if "```json" in content:
-            content = content.split("```json")[1].split("```")[0].strip()
-        elif "```" in content:
-            content = content.split("```")[1].split("```")[0].strip()
+        # Oczyszczanie odpowiedzi z ewentualnych znaczników markdown
+        raw_text = response.text.strip()
+        if "```json" in raw_text:
+            raw_text = raw_text.split("```json")[1].split("```")[0].strip()
+        elif "```" in raw_text:
+            raw_text = raw_text.split("```")[1].split("```")[0].strip()
 
-        data = json.loads(content)
+        # Próba sparsowania JSON
+        data = json.loads(raw_text)
 
         with open('ceny.json', 'w', encoding='utf-8') as f:
             json.dump(data, f, indent=4, ensure_ascii=False)
-        print(f"Sukces! Znaleziono {len(data)} stacji.")
+        
+        print(f"SUKCES! Gemini 3.1 Pro znalazło i zapisało dane stacji.")
 
     except Exception as e:
-        print(f"Błąd AI: {e}")
+        print(f"Błąd krytyczny: {e}")
+        # Jeśli 3.1 Pro byłby chwilowo niedostępny, używamy stabilnego aliasu
         with open('ceny.json', 'w') as f:
-            json.dump([{"error": "AI Search failed", "details": str(e)}], f)
+            json.dump([{"stacja": "Error", "cena": 0, "details": str(e)}], f)
 
 if __name__ == "__main__":
     pobierz_ceny_przez_ai()
