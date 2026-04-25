@@ -7,25 +7,39 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    permissions: # Dodatkowe zabezpieczenie uprawnień
+    permissions:
       contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Pobiera całą historię, co zapobiega błędom przy pushowaniu
+
       - name: Ustawienie Pythona
-        uses: actions/setup-python@v5 # Nowsza wersja
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+
       - name: Instalacja bibliotek
         run: pip install requests beautifulsoup4
+
       - name: Pobieranie danych
         run: python paliwo_scraper.py
+
       - name: Zapisanie zmian
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           git config --global user.name "PaliwoBot"
           git config --global user.email "bot@github.com"
-          git pull --rebase origin main  # TO NAPRAWI BŁĄD REJECTED
+          
+          # Dodajemy ceny.json do poczekalni
           git add ceny.json
+          
+          # Tworzymy commit, jeśli plik się zmienił
           git commit -m "Aktualizacja cen: $(date)" || exit 0
-          git push
+          
+          # POBIERAMY ZMIANY Z GITHUB (jeśli coś klikałeś w przeglądarce)
+          git pull --rebase origin main
+          
+          # WYMUSZAMY WYDRUK (FORCE PUSH)
+          git push origin main
