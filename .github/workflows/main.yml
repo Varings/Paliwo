@@ -12,7 +12,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # Pobiera całą historię, co zapobiega błędom przy pushowaniu
+          fetch-depth: 0
 
       - name: Ustawienie Pythona
         uses: actions/setup-python@v5
@@ -20,9 +20,13 @@ jobs:
           python-version: '3.11'
 
       - name: Instalacja bibliotek
-        run: pip install requests beautifulsoup4
+        # DODALIŚMY google-generativeai
+        run: pip install requests beautifulsoup4 google-generativeai
 
       - name: Pobieranie danych
+        # PRZEKAZUJEMY KLUCZ Z SEKRETÓW GITHUBA DO SKRYPTU
+        env:
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
         run: python paliwo_scraper.py
 
       - name: Zapisanie zmian
@@ -31,15 +35,7 @@ jobs:
         run: |
           git config --global user.name "PaliwoBot"
           git config --global user.email "bot@github.com"
-          
-          # Dodajemy ceny.json do poczekalni
           git add ceny.json
-          
-          # Tworzymy commit, jeśli plik się zmienił
-          git commit -m "Aktualizacja cen: $(date)" || exit 0
-          
-          # POBIERAMY ZMIANY Z GITHUB (jeśli coś klikałeś w przeglądarce)
+          git commit -m "Aktualizacja cen przez AI: $(date)" || exit 0
           git pull --rebase origin main
-          
-          # WYMUSZAMY WYDRUK (FORCE PUSH)
           git push origin main
