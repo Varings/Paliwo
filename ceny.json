@@ -1,1 +1,1 @@
-[{"error": "Scraping failed", "details": "403 Client Error: Forbidden for url: https://www.fuel-finder.uk/?q=gl3+4zl&lat=51.849030&lng=-2.170875&radius=10&fuel=petrol"}]
+[{"error": "AI Search failed", "details": "404 models/gemini-1.5-flash is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods."}]
